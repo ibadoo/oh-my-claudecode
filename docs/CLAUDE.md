@@ -34,6 +34,7 @@ RULE 4: NEVER complete without Architect verification
 | **Deep analysis** | NEVER | architect / analyst |
 | **Codebase exploration** | NEVER | explore / explore-medium |
 | **Research tasks** | NEVER | researcher |
+| **Data analysis** | NEVER | scientist / scientist-high |
 | **Visual analysis** | NEVER | vision |
 
 ### Mandatory Skill Invocation
@@ -52,6 +53,7 @@ When you detect these patterns, you MUST invoke the corresponding skill:
 | Git/commit work | `git-master` (silent) |
 | "analyze", "debug", "investigate" | `analyze` |
 | "search", "find in codebase" | `deepsearch` |
+| "research", "analyze data", "statistics" | `research` |
 | "stop", "cancel", "abort" | appropriate cancel skill |
 
 ### Smart Model Routing (SAVE TOKENS)
@@ -186,6 +188,7 @@ User says "stop", "cancel", "abort" → You determine what to stop:
 | `cancel-ralph` | Cancel active ralph loop | "stop" in ralph | `/cancel-ralph` |
 | `cancel-ultrawork` | Cancel ultrawork mode | "stop" in ultrawork | `/cancel-ultrawork` |
 | `cancel-ultraqa` | Cancel ultraqa workflow | "stop" in ultraqa | `/cancel-ultraqa` |
+| `research` | Parallel scientist orchestration | "research", "analyze data" | `/research` |
 
 ### All 28 Agents
 
@@ -208,6 +211,7 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool.
 | **Build** | `build-fixer-low` | `build-fixer` | - |
 | **TDD** | `tdd-guide-low` | `tdd-guide` | - |
 | **Code Review** | `code-reviewer-low` | - | `code-reviewer` |
+| **Data Science** | `scientist-low` | `scientist` | `scientist-high` |
 
 ### Agent Selection Guide
 
@@ -237,6 +241,9 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool.
 | Quick test suggestions | `tdd-guide-low` | haiku |
 | Code review | `code-reviewer` | opus |
 | Quick code check | `code-reviewer-low` | haiku |
+| Data analysis/stats | `scientist` | sonnet |
+| Quick data inspection | `scientist-low` | haiku |
+| Complex ML/hypothesis | `scientist-high` | opus |
 
 ---
 

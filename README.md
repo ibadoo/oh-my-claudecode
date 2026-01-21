@@ -68,37 +68,60 @@ Want explicit control? Include these words anywhere in your message:
 
 ---
 
-## Data Analysis with Scientist Agent (v3.3.0)
+## Data Analysis & Research (v3.3.3)
 
-The scientist agent provides persistent Python execution for data analysis:
+### Scientist Agent Tiers
 
-```
-# Variables persist across calls - no need to reload data!
+Three tiers of scientist agents for quantitative analysis and data science:
+
+| Agent | Model | Use For |
+|-------|-------|---------|
+| `scientist-low` | Haiku | Quick data inspection, simple statistics, file enumeration |
+| `scientist` | Sonnet | Standard analysis, pattern detection, visualization |
+| `scientist-high` | Opus | Complex reasoning, hypothesis validation, ML workflows |
+
+**Features:**
+- **Persistent Python REPL** - Variables persist across calls (no pickle/reload overhead)
+- **Structured markers** - `[FINDING]`, `[STAT:*]`, `[DATA]`, `[LIMITATION]` for parsed output
+- **Quality gates** - Every finding requires statistical evidence (CI, effect size, p-value)
+- **Auto-visualization** - Charts saved to `.omc/scientist/figures/`
+- **Report generation** - Markdown reports with embedded figures
+
+```python
+# Variables persist across calls!
 python_repl(action="execute", researchSessionID="analysis",
             code="import pandas as pd; df = pd.read_csv('data.csv')")
 
-# df still exists in the next call
+# df still exists - no need to reload
 python_repl(action="execute", researchSessionID="analysis",
             code="print(df.describe())")
 ```
 
-**Features:**
-- Variable persistence via Unix socket bridge
-- Structured markers: `[FINDING]`, `[STAT:*]`, `[DATA]`, `[LIMITATION]`
-- Memory tracking (RSS/VMS)
-- Session locking for safe concurrent access
+### /research Command (NEW)
 
-### /research Command
-
-Orchestrate parallel scientist agents for comprehensive research:
+Orchestrate parallel scientist agents for comprehensive research workflows:
 
 ```
-/research <goal>           # Standard research with checkpoints
-/research AUTO: <goal>     # Fully autonomous until complete
-/research status           # Check current session
+/research <goal>                    # Standard research with checkpoints
+/research AUTO: <goal>              # Fully autonomous until complete
+/research status                    # Check current session
+/research resume                    # Resume interrupted session
+/research list                      # List all sessions
+/research report <session-id>       # Generate report for session
 ```
 
-Features multi-stage decomposition, smart model routing, cross-validation, and structured report generation.
+**Research Protocol:**
+1. **Decomposition** - Breaks goal into 3-7 independent stages
+2. **Parallel Execution** - Fires scientist agents concurrently (max 5)
+3. **Cross-Validation** - Verifies consistency across findings
+4. **Synthesis** - Generates comprehensive markdown report
+
+**Smart Model Routing:**
+- Data gathering tasks → `scientist-low` (Haiku)
+- Standard analysis → `scientist` (Sonnet)
+- Complex reasoning → `scientist-high` (Opus)
+
+**Session Management:** Research state persists at `.omc/research/{session-id}/` enabling resume after interruption.
 
 ---
 
@@ -117,7 +140,8 @@ I'll intelligently determine what to stop based on context.
 
 - **28 Specialized Agents** - architect, researcher, explore, designer, writer, vision, critic, analyst, executor, planner, qa-tester, scientist (with tier variants)
 - **30 Skills** - orchestrate, ultrawork, ralph, planner, deepsearch, deepinit, git-master, frontend-ui-ux, learner, research, and more
-- **Persistent Python REPL** - True variable persistence for data analysis (new in 3.3.0)
+- **Persistent Python REPL** - True variable persistence for data analysis
+- **Research Workflow** - Parallel scientist orchestration with `/research` command (new in 3.3.3)
 - **HUD Statusline** - Real-time visualization of orchestration state
 - **Learned Skills** - Extract reusable insights from sessions with `/learner`
 - **Memory System** - Persistent context that survives compaction
