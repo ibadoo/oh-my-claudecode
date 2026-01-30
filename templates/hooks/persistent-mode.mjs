@@ -83,23 +83,20 @@ function countIncompleteTasks(sessionId) {
   return count;
 }
 
-function countIncompleteTodos(todosDir, projectDir) {
+function countIncompleteTodos(sessionId, projectDir) {
   let count = 0;
 
-  if (existsSync(todosDir)) {
+  // Session-specific todos only (no global scan)
+  if (sessionId && typeof sessionId === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,255}$/.test(sessionId)) {
+    const sessionTodoPath = join(homedir(), '.claude', 'todos', `${sessionId}.json`);
     try {
-      const files = readdirSync(todosDir).filter(f => f.endsWith('.json'));
-      for (const file of files) {
-        try {
-          const content = readFileSync(join(todosDir, file), 'utf-8');
-          const data = JSON.parse(content);
-          const todos = Array.isArray(data) ? data : (Array.isArray(data?.todos) ? data.todos : []);
-          count += todos.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
-        } catch { /* skip */ }
-      }
+      const data = readJsonFile(sessionTodoPath);
+      const todos = Array.isArray(data) ? data : (Array.isArray(data?.todos) ? data.todos : []);
+      count += todos.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
     } catch { /* skip */ }
   }
 
+  // Project-local todos only
   for (const path of [
     join(projectDir, '.omc', 'todos.json'),
     join(projectDir, '.claude', 'todos.json')
@@ -171,7 +168,6 @@ async function main() {
 
     const directory = data.directory || process.cwd();
     const sessionId = data.sessionId || data.session_id || '';
-    const todosDir = join(homedir(), '.claude', 'todos');
     const stateDir = join(directory, '.omc', 'state');
     const globalStateDir = join(homedir(), '.omc', 'state');
 
@@ -202,9 +198,9 @@ async function main() {
     const swarmMarker = existsSync(join(stateDir, 'swarm-active.marker'));
     const swarmSummary = readJsonFile(join(stateDir, 'swarm-summary.json'));
 
-    // Count incomplete items
+    // Count incomplete items (session-specific + project-local only)
     const taskCount = countIncompleteTasks(sessionId);
-    const todoCount = countIncompleteTodos(todosDir, directory);
+    const todoCount = countIncompleteTodos(sessionId, directory);
     const totalIncomplete = taskCount + todoCount;
 
     // Priority 1: Ralph Loop (explicit persistence mode)
@@ -217,8 +213,8 @@ async function main() {
         writeJsonFile(ralph.path, ralph.state);
 
         console.log(JSON.stringify({
-          continue: false,
-          reason: `[RALPH LOOP - ITERATION ${iteration + 1}/${maxIter}] Work is NOT done. Continue. When complete, output: <promise>${ralph.state.completion_promise || 'DONE'}</promise>\n${ralph.state.prompt ? `Task: ${ralph.state.prompt}` : ''}`
+          continue: true,
+          message: `[RALPH LOOP - ITERATION ${iteration + 1}/${maxIter}] Work is NOT done. Continue. When complete, output: <promise>${ralph.state.completion_promise || 'DONE'}</promise>\n${ralph.state.prompt ? `Task: ${ralph.state.prompt}` : ''}`
         }));
         return;
       }
@@ -234,8 +230,8 @@ async function main() {
           writeJsonFile(autopilot.path, autopilot.state);
 
           console.log(JSON.stringify({
-            continue: false,
-            reason: `[AUTOPILOT - Phase: ${phase}] Autopilot not complete. Continue working.`
+            continue: true,
+            message: `[AUTOPILOT - Phase: ${phase}] Autopilot not complete. Continue working.`
           }));
           return;
         }
@@ -253,8 +249,8 @@ async function main() {
           writeJsonFile(ultrapilot.path, ultrapilot.state);
 
           console.log(JSON.stringify({
-            continue: false,
-            reason: `[ULTRAPILOT] ${incomplete} workers still running. Continue.`
+            continue: true,
+            message: `[ULTRAPILOT] ${incomplete} workers still running. Continue.`
           }));
           return;
         }
@@ -271,8 +267,8 @@ async function main() {
           writeJsonFile(join(stateDir, 'swarm-summary.json'), swarmSummary);
 
           console.log(JSON.stringify({
-            continue: false,
-            reason: `[SWARM ACTIVE] ${pending} tasks remain. Continue working.`
+            continue: true,
+            message: `[SWARM ACTIVE] ${pending} tasks remain. Continue working.`
           }));
           return;
         }
@@ -290,8 +286,8 @@ async function main() {
           writeJsonFile(pipeline.path, pipeline.state);
 
           console.log(JSON.stringify({
-            continue: false,
-            reason: `[PIPELINE - Stage ${currentStage + 1}/${totalStages}] Pipeline not complete. Continue.`
+            continue: true,
+            message: `[PIPELINE - Stage ${currentStage + 1}/${totalStages}] Pipeline not complete. Continue.`
           }));
           return;
         }
@@ -307,8 +303,8 @@ async function main() {
         writeJsonFile(ultraqa.path, ultraqa.state);
 
         console.log(JSON.stringify({
-          continue: false,
-          reason: `[ULTRAQA - Cycle ${cycle + 1}/${maxCycles}] Tests not all passing. Continue fixing.`
+          continue: true,
+          message: `[ULTRAQA - Cycle ${cycle + 1}/${maxCycles}] Tests not all passing. Continue fixing.`
         }));
         return;
       }
@@ -342,8 +338,8 @@ async function main() {
       }
 
       console.log(JSON.stringify({
-        continue: false,
-        reason
+        continue: true,
+        message: reason
       }));
       return;
     }
@@ -371,31 +367,8 @@ async function main() {
       }
 
       console.log(JSON.stringify({
-        continue: false,
-        reason
-      }));
-      return;
-    }
-
-    // Priority 9: Generic Task/Todo continuation (no specific mode)
-    if (totalIncomplete > 0) {
-      const contFile = join(stateDir, 'continuation-count.json');
-      let contState = readJsonFile(contFile) || { count: 0 };
-      contState.count = (contState.count || 0) + 1;
-      writeJsonFile(contFile, contState);
-
-      if (contState.count > 15) {
-        console.log(JSON.stringify({
-          continue: true,
-          reason: `[CONTINUATION ESCAPE] Max continuations reached. Allowing stop.`
-        }));
-        return;
-      }
-
-      const itemType = taskCount > 0 ? 'Tasks' : 'todos';
-      console.log(JSON.stringify({
-        continue: false,
-        reason: `[CONTINUATION ${contState.count}/15] ${totalIncomplete} incomplete ${itemType}. Continue working.`
+        continue: true,
+        message: reason
       }));
       return;
     }

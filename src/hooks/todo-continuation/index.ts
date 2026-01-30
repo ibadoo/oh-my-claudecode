@@ -204,20 +204,8 @@ function getTodoFilePaths(sessionId?: string, directory?: string): string[] {
     paths.push(join(directory, '.claude', 'todos.json'));
   }
 
-  // Global todos directory
-  const todosDir = join(claudeDir, 'todos');
-  if (existsSync(todosDir)) {
-    try {
-      const files = readdirSync(todosDir);
-      for (const file of files) {
-        if (file.endsWith('.json')) {
-          paths.push(join(todosDir, file));
-        }
-      }
-    } catch (err) {
-      debugLog('Failed to read todos directory:', todosDir, err);
-    }
-  }
+  // NOTE: Global todos directory scan removed to prevent false positives.
+  // Only session-specific and project-local todos are now checked.
 
   return paths;
 }

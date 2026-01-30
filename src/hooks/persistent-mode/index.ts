@@ -491,13 +491,8 @@ export async function checkPersistentModes(
     return ultraworkResult;
   }
 
-  // Priority 3: Todo Continuation (baseline enforcement)
-  if (hasIncompleteTodos) {
-    const todoContResult = await checkTodoContinuation(sessionId, workingDir);
-    if (todoContResult?.shouldBlock) {
-      return todoContResult;
-    }
-  }
+  // NOTE: Priority 3 (Todo Continuation) removed to prevent false positives.
+  // Only explicit modes (ralph, autopilot, ultrawork, etc.) trigger continuation enforcement.
 
   // No blocking needed
   return {
@@ -509,23 +504,16 @@ export async function checkPersistentModes(
 
 /**
  * Create hook output for Claude Code
+ * NOTE: Always returns continue: true with soft enforcement via message injection.
+ * Never returns continue: false to avoid blocking user intent.
  */
 export function createHookOutput(result: PersistentModeResult): {
   continue: boolean;
-  reason?: string;
   message?: string;
 } {
-  if (!result.shouldBlock) {
-    // Allow stop, but optionally inject completion message
-    return {
-      continue: true,
-      message: result.message || undefined
-    };
-  }
-
-  // Block stop and inject continuation message
+  // Always allow stop, but inject message for soft enforcement
   return {
-    continue: false,
-    reason: result.message
+    continue: true,
+    message: result.message || undefined
   };
 }

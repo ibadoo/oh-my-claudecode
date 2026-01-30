@@ -233,40 +233,11 @@ function processKeywordDetector(input: HookInput): HookOutput {
 
 /**
  * Process stop continuation hook
- * Checks for incomplete todos and blocks stop if tasks remain
+ * NOTE: Simplified to always return continue: true (soft enforcement only).
+ * All continuation enforcement is now done via message injection, not blocking.
  */
-async function processStopContinuation(input: HookInput): Promise<HookOutput> {
-  const sessionId = input.sessionId;
-  const directory = input.directory || process.cwd();
-
-  // Extract stop context for abort detection (supports both camelCase and snake_case)
-  const stopContext: StopContext = {
-    stop_reason: (input as Record<string, unknown>).stop_reason as string | undefined,
-    stopReason: (input as Record<string, unknown>).stopReason as string | undefined,
-    user_requested: (input as Record<string, unknown>).user_requested as boolean | undefined,
-    userRequested: (input as Record<string, unknown>).userRequested as boolean | undefined,
-  };
-
-  // Never block context-limit stops (causes deadlock - issue #213)
-  if (isContextLimitStop(stopContext)) {
-    return { continue: true };
-  }
-
-  // Respect user abort
-  if (isUserAbort(stopContext)) {
-    return { continue: true };
-  }
-
-  // Check for incomplete todos
-  const incompleteTodos = await checkIncompleteTodos(sessionId, directory, stopContext);
-
-  if (incompleteTodos.count > 0) {
-    return {
-      continue: false,
-      reason: `${TODO_CONTINUATION_PROMPT}\n\n[Status: ${incompleteTodos.count} tasks remaining]`
-    };
-  }
-
+async function processStopContinuation(_input: HookInput): Promise<HookOutput> {
+  // Always allow stop - no hard blocking
   return { continue: true };
 }
 
