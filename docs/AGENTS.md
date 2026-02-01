@@ -79,7 +79,7 @@ Use raw GitHub URLs for external accessibility:
 Use consistent version heading format with blank line after heading:
 
 ```markdown
-## v3.8.16 Changes
+## v3.8.17 Changes
 
 - Feature A
 - Feature B

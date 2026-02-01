@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.17] - 2026-02-01
+
+### Fixed
+
+- **MCP Tool Name Length** (PR #252, fixes #241, #232, #235) - Shortened MCP server name from `omc-tools` to `t` to fix tool names exceeding the 64-character API limit. The longest tool name (`lsp_diagnostics_directory`) now uses 57 characters instead of 65.
+
+---
+
 ## [3.8.16] - 2026-02-01
 
 ### Changed
