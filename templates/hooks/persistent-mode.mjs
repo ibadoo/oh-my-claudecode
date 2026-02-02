@@ -11,13 +11,13 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Dynamic import for the shared stdin module
-const { readStdin } = await import(join(__dirname, 'lib', 'stdin.mjs'));
+const { readStdin } = await import(pathToFileURL(join(__dirname, 'lib', 'stdin.mjs')).href);
 
 function readJsonFile(path) {
   try {
@@ -31,8 +31,8 @@ function readJsonFile(path) {
 function writeJsonFile(path, data) {
   try {
     // Ensure directory exists
-    const dir = path.substring(0, path.lastIndexOf('/'));
-    if (dir && !existsSync(dir)) {
+    const dir = dirname(path);
+    if (dir && dir !== '.' && !existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
     writeFileSync(path, JSON.stringify(data, null, 2));
@@ -190,7 +190,11 @@ async function main() {
   try {
     const input = await readStdin();
     let data = {};
-    try { data = JSON.parse(input); } catch {}
+    try { data = JSON.parse(input); } catch {
+      // Invalid JSON - allow stop to prevent hanging
+      process.stdout.write(JSON.stringify({ continue: true }) + '\n');
+      return;
+    }
 
     const directory = data.directory || process.cwd();
     const sessionId = data.sessionId || data.session_id || '';
@@ -345,7 +349,10 @@ async function main() {
 
     // Priority 7: Ultrawork - ALWAYS continue while active (not just when tasks exist)
     // This prevents false stops from bash errors, transient failures, etc.
-    if (ultrawork.state?.active && !isStaleState(ultrawork.state)) {
+    // Session isolation: only block if state belongs to this session (issue #311)
+    // If state has session_id, it must match. If no session_id (legacy), allow.
+    if (ultrawork.state?.active && !isStaleState(ultrawork.state) &&
+        (!ultrawork.state.session_id || ultrawork.state.session_id === sessionId)) {
       const newCount = (ultrawork.state.reinforcement_count || 0) + 1;
       const maxReinforcements = ultrawork.state.max_reinforcements || 50;
 
@@ -416,9 +423,69 @@ async function main() {
     console.log(JSON.stringify({ continue: true }));
   } catch (error) {
     // On any error, allow stop rather than blocking forever
-    console.error(`[persistent-mode] Error: ${error.message}`);
-    console.log(JSON.stringify({ continue: true }));
+    // CRITICAL: Use process.stdout.write instead of console.log to avoid
+    // cascading errors if stdout/stderr are broken (issue #319)
+    // Wrap in try-catch to handle EPIPE and other stream errors gracefully
+    try {
+      process.stderr.write(`[persistent-mode] Error: ${error?.message || error}\n`);
+    } catch {
+      // Ignore stderr errors - we just need to return valid JSON
+    }
+    try {
+      process.stdout.write(JSON.stringify({ continue: true }) + '\n');
+    } catch {
+      // If stdout write fails, the hook will timeout and Claude Code will proceed
+      // This is better than hanging forever
+      process.exit(0);
+    }
   }
 }
 
-main();
+// Global error handlers to prevent hook from hanging on uncaught errors (issue #319)
+process.on('uncaughtException', (error) => {
+  try {
+    process.stderr.write(`[persistent-mode] Uncaught exception: ${error?.message || error}\n`);
+  } catch {
+    // Ignore
+  }
+  try {
+    process.stdout.write(JSON.stringify({ continue: true }) + '\n');
+  } catch {
+    // If we can't write, just exit
+  }
+  process.exit(0);
+});
+
+process.on('unhandledRejection', (error) => {
+  try {
+    process.stderr.write(`[persistent-mode] Unhandled rejection: ${error?.message || error}\n`);
+  } catch {
+    // Ignore
+  }
+  try {
+    process.stdout.write(JSON.stringify({ continue: true }) + '\n');
+  } catch {
+    // If we can't write, just exit
+  }
+  process.exit(0);
+});
+
+// Safety timeout: if hook doesn't complete in 10 seconds, force exit
+// This prevents infinite hangs from any unforeseen issues
+const safetyTimeout = setTimeout(() => {
+  try {
+    process.stderr.write('[persistent-mode] Safety timeout reached, forcing exit\n');
+  } catch {
+    // Ignore
+  }
+  try {
+    process.stdout.write(JSON.stringify({ continue: true }) + '\n');
+  } catch {
+    // If we can't write, just exit
+  }
+  process.exit(0);
+}, 10000);
+
+main().finally(() => {
+  clearTimeout(safetyTimeout);
+});
